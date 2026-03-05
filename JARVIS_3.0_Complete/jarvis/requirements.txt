@@ -1,0 +1,31 @@
+# J.A.R.V.I.S. 3.0 — Python Dependencies
+
+# Telegram Bot
+python-telegram-bot==21.3
+
+# Anthropic Claude
+anthropic==0.28.0
+
+# OpenAI (embeddings + TTS only)
+openai==1.35.0
+
+# Google APIs (Gmail, Calendar, Sheets)
+google-auth==2.30.0
+google-auth-oauthlib==1.2.0
+google-auth-httplib2==0.2.0
+google-api-python-client==2.134.0
+
+# Pinecone (vector database)
+pinecone-client==4.1.0
+
+# Token counting for chunking
+tiktoken==0.7.0
+
+# FastAPI orchestrator server
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+pydantic==2.7.4
+
+# Utilities
+python-dotenv==1.0.1
+httpx==0.27.0

@@ -1,0 +1,155 @@
+{
+  "name": "JARVIS_00_Main_Orchestrator",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["message"],
+        "additionalFields": {}
+      },
+      "id": "telegram-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "credentials": { "telegramApi": { "id": "1", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract and normalize message data\nconst msg = $input.item.json.message || $input.item.json.edited_message || {};\nconst text = msg.text || '';\nconst chat_id = String(msg.chat?.id || '');\nconst user_id = String(msg.from?.id || '');\nconst username = msg.from?.username || msg.from?.first_name || 'User';\n\nif (!text || !chat_id) {\n  return [{ json: { skip: true } }];\n}\n\nreturn [{ json: { chat_id, user_id, username, text, timestamp: new Date().toISOString() } }];"
+      },
+      "id": "extract-message",
+      "name": "Extract Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [{ "value1": "={{ $json.skip }}", "value2": true }]
+        }
+      },
+      "id": "skip-check",
+      "name": "Skip Empty?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.JARVIS_ORCHESTRATOR_URL }}/webhook/message",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "chat_id", "value": "={{ $json.chat_id }}" },
+            { "name": "text", "value": "={{ $json.text }}" },
+            { "name": "user_id", "value": "={{ $json.user_id }}" },
+            { "name": "username", "value": "={{ $json.username }}" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "id": "call-orchestrator",
+      "name": "Call Orchestrator",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 220]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [{ "value1": "={{ $json.intent }}", "operation": "equals", "value2": "tts" }]
+        }
+      },
+      "id": "is-tts",
+      "name": "Is TTS?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1060, 220]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Extract Message').item.json.chat_id }}",
+        "text": "={{ $json.reply }}",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "send-text-reply",
+      "name": "Send Text Reply",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1260, 160],
+      "credentials": { "telegramApi": { "id": "1", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Decode base64 audio to binary\nconst audioB64 = $json.audio_base64;\nconst audioBuffer = Buffer.from(audioB64, 'base64');\nreturn [{ json: $json, binary: { data: { data: audioBuffer, mimeType: 'audio/mpeg', fileName: 'jarvis_voice.mp3' } } }];"
+      },
+      "id": "decode-audio",
+      "name": "Decode Audio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1260, 300]
+    },
+    {
+      "parameters": {
+        "operation": "sendVoice",
+        "chatId": "={{ $('Extract Message').item.json.chat_id }}",
+        "voice": "data",
+        "additionalFields": {}
+      },
+      "id": "send-voice",
+      "name": "Send Voice",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1460, 300],
+      "credentials": { "telegramApi": { "id": "1", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Extract Message').item.json.chat_id }}",
+        "text": "⚠️ *JARVIS Error*\n`{{ $json.error || 'Unknown error' }}`\nPlease try again.",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "send-error",
+      "name": "Send Error",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1060, 400],
+      "credentials": { "telegramApi": { "id": "1", "name": "Telegram Bot" } }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": { "main": [[{ "node": "Extract Message", "type": "main", "index": 0 }]] },
+    "Extract Message": { "main": [[{ "node": "Skip Empty?", "type": "main", "index": 0 }]] },
+    "Skip Empty?": {
+      "main": [
+        [],
+        [{ "node": "Call Orchestrator", "type": "main", "index": 0 }]
+      ]
+    },
+    "Call Orchestrator": {
+      "main": [
+        [{ "node": "Is TTS?", "type": "main", "index": 0 }],
+        [{ "node": "Send Error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is TTS?": {
+      "main": [
+        [{ "node": "Decode Audio", "type": "main", "index": 0 }],
+        [{ "node": "Send Text Reply", "type": "main", "index": 0 }]
+      ]
+    },
+    "Decode Audio": { "main": [[{ "node": "Send Voice", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "JARVIS_99_Error_Handler"
+  }
+}

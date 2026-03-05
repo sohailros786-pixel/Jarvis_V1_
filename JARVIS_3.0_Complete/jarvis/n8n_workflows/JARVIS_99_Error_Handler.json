@@ -1,0 +1,40 @@
+{
+  "name": "JARVIS_99_Error_Handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const err = $input.item.json;\nconst workflowName = err.workflow?.name || 'Unknown';\nconst nodeName = err.execution?.lastNodeExecuted || 'Unknown';\nconst errorMsg = err.execution?.error?.message || 'Unknown error';\nconst execId = err.execution?.id || '';\n\nconst msg = `🚨 *JARVIS Error Report*\\n\\n*Workflow:* ${workflowName}\\n*Node:* ${nodeName}\\n*Error:* \\`${errorMsg}\\`\\n*Execution:* ${execId}\\n*Time:* ${new Date().toISOString()}`;\n\nreturn [{ json: { message: msg, workflowName, errorMsg } }];"
+      },
+      "id": "format-error",
+      "name": "Format Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_ADMIN_CHAT_ID }}",
+        "text": "={{ $json.message }}",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "notify-admin",
+      "name": "Notify Admin",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [640, 300],
+      "credentials": { "telegramApi": { "id": "1", "name": "Telegram Bot" } }
+    }
+  ],
+  "connections": {
+    "Error Trigger": { "main": [[{ "node": "Format Error", "type": "main", "index": 0 }]] },
+    "Format Error": { "main": [[{ "node": "Notify Admin", "type": "main", "index": 0 }]] }
+  }
+}
